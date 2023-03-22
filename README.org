@@ -1,0 +1,116 @@
+* Setup/Install
+** Clone and build images
+
+1. Clone ringsdb repository.
+2. Clone docker-ringsdb repository. Assumption that these folders are beside
+   each other (siblings).
+3. Build =php-composer= (x2) and =ringsdb-apache= images.
+
+*** HTTPS
+
+By default, running the application with apache will run in =prod= environment
+and require an *https* channel is used. Create self-signed certs:
+
+#+begin_src
+openssl req -x509 -new -out mycert.crt -keyout mycert.key -days 365 -newkey rsa:4096 -sha256 -nodes
+#+end_src
+
+For a excellent guide, see this Docker forums answer for [[https://forums.docker.com/t/setup-local-domain-and-ssl-for-php-apache-container/116015/2][setting up a local
+domain and SSL with Apache]].
+
+** Composer install
+
+Using /php-composer/ images, run =composer install= successfully. I've had
+issues due to the age of the project, vendor directory being commited to
+source control, and composer.json not being updated. This combination seems
+to have worked with alot of trial and error:
+
+1. v2 =composer update=
+2. v1 =composer install=
+3. git restore changes (to avoid pushing modified vendor files upstream)
+
+** Database setup
+
+1. Run the database and application using =docker compose up=.
+2. Using /your preferred method e.g phpmyadmin/, create the =ringsdb= database
+   and grant permissions to =ringsdbapp= user to that database. Example:
+
+   #+begin_src sql
+   -- Ideally the password would be hashed, but okay for dev purposes
+   CREATE USER 'ringsdbapp'@'%' IDENTIFIED BY '<your password here>';
+
+   CREATE DATABASE RINGSDB;
+
+    -- Overkill, but okay for dev purposes
+   GRANT ALL PRIVILEGES ON ringsdb.* TO ringsdbapp@'%'
+   #+end_src
+   
+3. Finish setting up the database with =php app/console doctrine:schema:create=.
+   To do this, exec a shell on the application container:
+
+   #+begin_src sh
+   docker exec -it ringsdb-php sh
+
+   # In the container:
+   cd /rings-db
+   php app/console doctrine:schema:create
+   #+end_src
+
+
+7. Run all =*.sql= files in the /ringsdb/ repo root. These files are out of date
+   but good enough to do testing/dev with.
+
+8. You might need to clear cache again and recreate css/js/font assets:
+
+   #+begin_src sh
+   docker exec -it ringsdb-php sh
+
+   # In the container:
+   php app/console cache:clear
+   php app/console assetic:dump
+   #+end_src
+
+* Container images
+** php-composer
+
+This image is for running PHP =composer= commands against the application files.
+
+** With composer v1
+
+#+begin_src sh
+docker build --build-arg COMPOSER_VERSION=1  -t php-composer:v1 .
+#+end_src
+
+** With composer v2
+
+#+begin_src sh
+docker build --build-arg COMPOSER_VERSION=2  -t php-composer:v2 .
+#+end_src
+
+** ringsdb-apache
+
+This image is for running the application.
+
+#+begin_src sh
+docker build -t ringsdb-apache:latest - < Dockerfile-apache
+#+end_src
+
+* Usage
+
+** Run everything wth Docker Compose
+
+#+begin_src sh
+docker compose up
+#+end_src
+
+** Work with application files using composer v1
+
+#+begin_src sh
+docker run -v "/path/to/ringsdb:/app" --rm -it php-composer:v1 sh
+#+end_src
+
+** Work with application files using composer v2
+
+#+begin_src sh
+docker run -v "/path/to/ringsdb:/app" --rm -it php-composer:v2 sh
+#+end_src

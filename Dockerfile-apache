@@ -1,0 +1,27 @@
+FROM php:7.2-apache
+
+ENV APACHE_DOCUMENT_ROOT /ringsdb/web
+
+# PHP gd setup based on https://stackoverflow.com/questions/39657058/installing-gd-in-docker
+# SSL setup based on https://forums.docker.com/t/setup-local-domain-and-ssl-for-php-apache-container/116015/2
+
+RUN a2enmod rewrite && a2enmod ssl && a2enmod socache_shmcb
+RUN docker-php-ext-install mysqli pdo pdo_mysql
+
+RUN apt-get update -y && apt-get install -y libwebp-dev libjpeg62-turbo-dev libpng-dev \
+    libfreetype6-dev
+
+RUN docker-php-ext-configure gd \
+    --with-gd \
+    --with-jpeg-dir \
+    --with-png-dir \
+    --with-webp-dir \
+    --with-freetype-dir
+
+RUN docker-php-ext-install gd
+
+RUN sed -i '/SSLCertificateFile.*snakeoil\.pem/c\SSLCertificateFile \/etc\/ssl\/certs\/mycert.crt' /etc/apache2/sites-available/default-ssl.conf && sed -i '/SSLCertificateKeyFile.*snakeoil\.key/cSSLCertificateKeyFile /etc/ssl/private/mycert.key\' /etc/apache2/sites-available/default-ssl.conf
+RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
+RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
+
+RUN a2ensite default-ssl

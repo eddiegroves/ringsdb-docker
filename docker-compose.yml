@@ -1,0 +1,41 @@
+services:
+  ringsdb-php:
+    container_name: ringsdb-php
+    image: ringsdb-apache
+    ports:
+      - "8000:80"
+      - "8443:443"
+      - "443:443"
+    links:
+      - db
+    volumes:
+      - ./mycert.crt:/etc/ssl/certs/mycert.crt
+      - ./mycert.key:/etc/ssl/private/mycert.key
+      - ../ringsdb:/ringsdb
+    restart: always
+  db:
+    image: yobasystems/alpine-mariadb:10.4.17
+    container_name: ringsdb-db
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ringsdbroot
+    volumes:
+      - mysql-data:/var/lib/mysql
+    restart: always
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin
+    environment:
+      - PMA_ARBITRARY=1
+    restart: always
+    links:
+      - db
+    ports:
+      - 8081:80
+    volumes:
+      - /sessions
+    profiles:
+      - phpmyadmin
+volumes:
+  mysql-data:
